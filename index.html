@@ -12,8 +12,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="dark">
 <header class="topbar">
+  <div class="traffic" aria-hidden="true"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+  <button id="menuBtn" class="ghost" title="Toggle sidebar">☰</button>
   <div class="brand">
     <img src="logo.svg" alt="ClipChad logo" class="brand-logo" />
     <span class="ver-badge">4K UHD</span>
@@ -41,11 +43,11 @@
       <option value="30" selected>30 fps</option>
       <option value="60">60 fps</option>
     </select>
-    <button id="undoBtn" title="Undo (Ctrl+Z)">↩</button>
-    <button id="redoBtn" title="Redo (Ctrl+Y)">↪</button>
     <button id="saveBtn" class="ghost" title="Save project JSON">💾 Save</button>
     <button id="loadBtn" class="ghost" title="Load project JSON">📂 Load</button>
-    <button id="exportBtn" class="export">⬇ Export 4K</button>
+    <button id="themeBtn" class="ghost" title="Toggle theme">Light</button>
+    <div class="avatars" title="Workspace"><span>CC</span></div>
+    <button id="exportBtn" class="export">Export</button>
   </div>
 </header>
 
@@ -53,21 +55,22 @@
   <!-- LEFT SIDEBAR -->
   <aside class="sidebar">
     <nav class="tabs" id="tabs">
-      <button data-tab="media" class="on"><span>Media</span></button>
-      <button data-tab="record"><span>Record</span></button>
-      <button data-tab="text"><span>Text</span></button>
-      <button data-tab="audio"><span>Audio</span></button>
-      <button data-tab="trans"><span>Transit.</span></button>
-      <button data-tab="elem"><span>Elements</span></button>
-      <button data-tab="filt"><span>Filters</span></button>
-      <button data-tab="tmpl"><span>Templates</span></button>
-      <button data-tab="brand"><span>Brand</span></button>
-      <button data-tab="cap"><span>Captions</span></button>
+      <button data-tab="media" class="on"><i>▤</i><span>Media</span></button>
+      <button data-tab="record"><i>●</i><span>Record</span></button>
+      <button data-tab="text"><i>T</i><span>Text</span></button>
+      <button data-tab="audio"><i>♪</i><span>Audio</span></button>
+      <button data-tab="trans"><i>⇄</i><span>Transit.</span></button>
+      <button data-tab="elem"><i>✦</i><span>Elements</span></button>
+      <button data-tab="filt"><i>◑</i><span>Filters</span></button>
+      <button data-tab="tmpl"><i>▦</i><span>Templates</span></button>
+      <button data-tab="brand"><i>◆</i><span>Brand</span></button>
+      <button data-tab="cap"><i>CC</i><span>Captions</span></button>
     </nav>
     <div class="panels">
       <section data-panel="media" class="on">
         <div class="panel-head"><h3>Your media</h3><button id="importBtn" class="primary sm">+ Import</button></div>
         <p class="muted">Drop video / image / audio anywhere. Everything stays in your browser.</p>
+        <input type="text" id="mediaSearch" placeholder="Search media" />
         <input type="file" id="fileInput" accept="video/*,image/*,audio/*,.mkv,.mov,.mp4,.webm,.m4v,.avi,.flv,.mp3,.wav,.ogg,.opus,.m4a,.flac,.aac,.png,.jpg,.jpeg,.gif,.webp,.bmp,.heic" multiple hidden />
         <input type="file" id="projInput" accept="application/json" hidden />
         <div id="mediaGrid" class="media-grid"></div>
@@ -185,36 +188,48 @@
 
   <!-- CENTER -->
   <section class="center">
-    <div class="floatbar" id="floatbar">
-      <button data-act="fit" title="Fit">⛶ Fit</button>
-      <button data-act="fill" title="Fill">🖼 Fill</button>
-      <button data-act="rot" title="Rotate 90°">⟳</button>
-      <button data-act="flip" title="Flip horizontal">⇋</button>
-      <button data-act="pip" title="Picture-in-picture corner">🪟 PiP</button>
-      <button data-act="bg" title="Background color">🎨 BG</button>
-      <input type="color" id="bgColor" value="#000000" title="Background color" />
-    </div>
-    <div class="preview-wrap" id="previewWrap">
-      <canvas id="preview"></canvas>
-      <div id="dropHint" class="drop-hint">Drop media here or <b>+ Import</b><br/><small>video • image • audio • MKV supported</small></div>
+    <div class="preview-row">
+      <div class="preview-wrap" id="previewWrap">
+        <canvas id="preview"></canvas>
+        <div id="dropHint" class="drop-hint">Drop media here or <b>+ Import</b><br/><small>video • image • audio • MKV supported</small></div>
+      </div>
+      <div class="floatbar" id="floatbar">
+        <span class="fb-title">Edit</span>
+        <button data-act="fit" title="Fit">⛶ Fit</button>
+        <button data-act="fill" title="Fill">Fill</button>
+        <button data-act="rot" title="Rotate 90°">⟳</button>
+        <button data-act="flip" title="Flip horizontal">⇋</button>
+        <button data-act="pip" title="Picture-in-picture corner">PiP</button>
+        <button data-act="bg" title="Background color">BG</button>
+        <input type="color" id="bgColor" value="#000000" title="Background color" />
+      </div>
     </div>
     <div class="transport">
-      <button id="playBtn" class="play">▶</button>
-      <button id="backBtn" title="-1s">⏪</button>
-      <button id="fwdBtn" title="+1s">⏩</button>
       <span id="timeLabel">00:00.0 / 00:00.0</span>
+      <div class="tgroup">
+        <button id="undoBtn" title="Undo (Ctrl+Z)">↩</button>
+        <button id="redoBtn" title="Redo (Ctrl+Y)">↪</button>
+      </div>
+      <div class="tgroup main">
+        <button id="backBtn" title="-1s">⏪</button>
+        <button id="playBtn" class="play">▶</button>
+        <button id="fwdBtn" title="+1s">⏩</button>
+      </div>
+      <div class="tgroup">
+        <button id="splitBtn" title="Split selected clip at playhead (S)">✂ Split</button>
+        <button id="gapBtn" title="Remove gaps">Gaps</button>
+      </div>
       <input type="range" id="scrub" min="0" max="1000" value="0" />
-      <button id="splitBtn" title="Split selected clip at playhead (S)">✂ Split</button>
-      <button id="gapBtn" title="Remove gaps">🧹 Gaps</button>
-      <label class="zoom">🔍 <input type="range" id="zoom" min="20" max="220" value="80" /></label>
     </div>
     <div class="timeline" id="timeline">
       <div class="ruler" id="ruler"></div>
-      <div class="track" data-track="video"><span class="tlabel">Video</span><div class="lane" id="lane-video"></div></div>
-      <div class="track" data-track="overlay"><span class="tlabel">Overlays</span><div class="lane" id="lane-overlay"></div></div>
-      <div class="track" data-track="audio"><span class="tlabel">Audio</span><div class="lane" id="lane-audio"></div></div>
+      <div class="track" data-track="video"><span class="tlabel">Video <button class="eye" data-eye="video" title="Show/hide track">◉</button></span><div class="lane" id="lane-video"></div></div>
+      <div class="track" data-track="overlay"><span class="tlabel">Overlay <button class="eye" data-eye="overlay" title="Show/hide track">◉</button></span><div class="lane" id="lane-overlay"></div></div>
+      <div class="track" data-track="audio"><span class="tlabel">Audio <button class="eye" data-eye="audio" title="Mute track">◉</button></span><div class="lane" id="lane-audio"></div></div>
+      <div class="track" data-track="captions"><span class="tlabel">Captions <button class="eye" data-eye="captions" title="Show/hide captions">◉</button></span><div class="lane" id="lane-captions"></div></div>
       <div class="playhead" id="playhead"></div>
     </div>
+    <div class="tl-foot"><span id="projInfo" class="muted"></span><label class="zoom"><span id="zoomPct">100%</span><input type="range" id="zoom" min="20" max="220" value="80" /></label></div>
   </section>
 
   <!-- RIGHT PROPS -->
@@ -244,6 +259,11 @@
         <label>Y (−1..1) <input id="pY" type="range" min="-1" max="1" step="0.02" /></label>
       </div>
       <label>Rotation° <input id="pRot" type="range" min="-180" max="180" step="1" /></label>
+      <div id="kfBox">
+        <div class="kf-head"><span>Keyframes</span><button id="kfClear" class="sm">Clear</button></div>
+        <div id="kfGrid"></div>
+        <p class="muted">Move the playhead, set a value above, press ◇ to key it. Values tween between keyframes.</p>
+      </div>
       <div class="grid2">
         <label>Brightness <input id="pBri" type="range" min="0.4" max="1.8" step="0.05" /></label>
         <label>Contrast <input id="pCon" type="range" min="0.4" max="1.8" step="0.05" /></label>

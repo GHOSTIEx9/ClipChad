@@ -27,13 +27,14 @@ const S = {
   selected: null,
   aspect: "16:9",
   bg: "#000000",
+  hidden: { video: false, overlay: false, audio: false, captions: false },
   brand: { color: "#22d3ee", name: "CHAD TV", logoId: null },
 };
 let pxPerSec = 80;
 let undoStack = [], redoStack = [];
 function snap() { return JSON.stringify({ clips: S.clips, captions: S.captions, bg: S.bg, aspect: S.aspect }); }
 function pushUndo() { undoStack.push(snap()); if (undoStack.length > 80) undoStack.shift(); redoStack = []; }
-function restore(j) { const o = JSON.parse(j); S.clips = o.clips; S.captions = o.captions; S.bg = o.bg; S.aspect = o.aspect; S.selected = null; S.playing = false; pauseAll(); renderAll(); }
+function restore(j) { const o = JSON.parse(j); S.clips = o.clips; S.captions = o.captions; S.bg = o.bg; S.aspect = o.aspect; if (o.hidden) S.hidden = o.hidden; S.clips.forEach(normClip); S.selected = null; S.playing = false; pauseAll(); renderAll(); }
 function undo() { if (!undoStack.length) return toast("Nothing to undo"); redoStack.push(snap()); restore(undoStack.pop()); }
 function redo() { if (!redoStack.length) return toast("Nothing to redo"); undoStack.push(snap()); restore(redoStack.pop()); }
 
@@ -77,7 +78,7 @@ function kindFromFile(f) {
   return null;
 }
 function addFiles(files) {
-  [...files].forEach((f) => {
+  Array.from(files || []).forEach((f) => {
     const url = URL.createObjectURL(f);
     const kind = kindFromFile(f);
     if (!kind) { URL.revokeObjectURL(url); return toast("Skipped " + f.name + " (need video/image/audio)"); }
@@ -224,8 +225,10 @@ async function synthTone(kind) {
 /* ================= RENDER: media bin / timeline / props ================= */
 function renderMedia() {
   const g = $("#mediaGrid"); g.innerHTML = "";
-  if (!S.media.length) { g.innerHTML = `<p class="muted">Empty — import or record something.</p>`; return; }
-  S.media.forEach((m) => {
+  const q = (($("#mediaSearch") || {}).value || "").toLowerCase().trim();
+  const list = S.media.filter((m) => !q || (m.name || "").toLowerCase().includes(q));
+  if (!list.length) { g.innerHTML = `<p class="muted">${S.media.length ? "No matches." : "Empty — import or record something."}</p>`; return; }
+  list.forEach((m) => {
     const d = document.createElement("div"); d.className = "mitem";
     let th = "";
     if (m.kind === "image") th = `<img src="${m.url}" />`;
@@ -252,16 +255,27 @@ function rulerStep() {
   const steps = [0.1, 0.5, 1, 2, 5, 10, 30, 60];
   return steps.find((s) => s >= target) || 60;
 }
-function renderTimeline() {
+function updatePlayhead() {
+  // light per-frame updater — never rebuilds clip DOM (keeps drags/focus intact)
   const dur = projectDuration();
   $("#durLabel").textContent = fmt(dur);
   $("#timeLabel").textContent = `${fmt(S.currentTime)} / ${fmt(dur)}`;
+  $("#playhead").style.left = 108 + S.currentTime * pxPerSec + "px";
+  const sc = $("#scrub");
+  if (document.activeElement !== sc) sc.value = Math.round((S.currentTime / dur) * 1000);
+  const zp = $("#zoomPct");
+  if (zp) zp.textContent = Math.round((pxPerSec / 80) * 100) + "%";
+  const pi = $("#projInfo");
+  if (pi) pi.textContent = `${S.aspect} • ${$("#resSel").value} • ${fmt(dur)}`;
+}
+function renderTimeline() {
+  const dur = projectDuration();
   const r = $("#ruler"); r.innerHTML = "";
   const step = rulerStep();
   const w = Math.max(dur * pxPerSec, $("#timeline").clientWidth - 100);
   for (let t = 0; t <= dur + 0.01; t += step) {
     const s = document.createElement("span");
-    s.style.left = 86 + t * pxPerSec + "px"; s.textContent = fmt(t);
+    s.style.left = 108 + t * pxPerSec + "px"; s.textContent = fmt(t);
     r.appendChild(s);
   }
   ["video", "overlay", "audio"].forEach((tr) => {
@@ -273,9 +287,10 @@ function renderTimeline() {
       d.style.left = c.start * pxPerSec + "px";
       d.style.width = Math.max(14, c.duration * pxPerSec) + "px";
       d.title = `${c.name} — ${fmt(c.start)} → ${fmt(c.start + c.duration)}`;
-      d.innerHTML = `<div class="h l"></div><span style="overflow:hidden;text-overflow:ellipsis">${c.kind === "text" ? "🔤 " : c.kind === "sticker" ? "" : c.kind === "audio" ? "🎵 " : "🎬 "}${(c.text || c.name || "").slice(0, 26)}</span><div class="h r"></div>`;
+      d.innerHTML = `<div class="h l"></div><span style="overflow:hidden;text-overflow:ellipsis">${hasKf(c) ? "◆ " : ""}${c.kind === "text" ? "🔤 " : c.kind === "sticker" ? "" : c.kind === "audio" ? "🎵 " : "🎬 "}${(c.text || c.name || "").slice(0, 26)}</span><div class="h r"></div>`;
       d.onpointerdown = (e) => clipPointer(e, c, d);
       d.oncontextmenu = (e) => { e.preventDefault(); S.selected = c.id; renderAll(); showCtx(e.clientX, e.clientY, c); };
+      if (c.kind === "image") { const mm = getMedia(c.mediaId); if (mm && mm.url) d.style.backgroundImage = `url("${mm.url}")`; }
       lane.appendChild(d);
     });
     lane.onclick = (e) => {
@@ -284,15 +299,35 @@ function renderTimeline() {
       seek((e.clientX - rect.left) / pxPerSec);
     };
   });
-  const ph = $("#playhead");
-  ph.style.left = 86 + S.currentTime * pxPerSec + "px";
-  $("#scrub").value = Math.round((S.currentTime / dur) * 1000);
+  const cl = $("#lane-captions");
+  cl.innerHTML = ""; cl.style.width = w + "px";
+  cl.onclick = (e) => {
+    if (e.target !== cl) return;
+    const rect = cl.getBoundingClientRect();
+    seek((e.clientX - rect.left) / pxPerSec);
+  };
+  if (!S.hidden.captions) S.captions.forEach((cc) => {
+    const d = document.createElement("div");
+    d.className = "capblk";
+    d.style.left = cc.start * pxPerSec + "px";
+    d.style.width = Math.max(14, (cc.end - cc.start) * pxPerSec) + "px";
+    d.textContent = cc.text; d.title = `${fmt(cc.start)} → ${fmt(cc.end)}`;
+    d.onclick = (ev) => { ev.stopPropagation(); seek(cc.start); };
+    cl.appendChild(d);
+  });
+  $$("#timeline .eye").forEach((b) => {
+    const off = !!S.hidden[b.dataset.eye];
+    b.textContent = off ? "○" : "◉";
+    b.classList.toggle("off", off);
+  });
+  updatePlayhead();
 }
 function renderProps() {
   const c = getClip(S.selected);
   $("#noSel").hidden = !!c;
   $("#propForm").hidden = !c;
   if (!c) return;
+  normClip(c);
   const set = (id, v) => { const el = $(id); if (document.activeElement !== el) el.value = v; };
   set("#pName", c.name); set("#pStart", c.start.toFixed(2)); set("#pDur", c.duration.toFixed(2));
   set("#pVol", c.vol); set("#pSpeed", c.speed); set("#pFadeIn", c.fadeIn); set("#pFadeOut", c.fadeOut);
@@ -304,6 +339,14 @@ function renderProps() {
   if (isText) { set("#pText", c.text); set("#pFont", c.font); set("#pColor", c.color); }
   $("#volRow").style.display = (c.kind === "audio" || (c.kind === "video" && getMedia(c.mediaId)?.kind === "video")) ? "grid" : "none";
   $("#projBg").value = S.bg;
+  const grid = $("#kfGrid");
+  if (grid) {
+    const rows = c.kind === "audio" ? ["vol"] : KF_PROPS;
+    grid.innerHTML = rows.map((p) => {
+      const n = (c.kf && c.kf[p] && c.kf[p].length) || 0;
+      return `<div class="kf-row"><b>${KF_LABEL[p]}</b><span class="n">${n}</span><button data-kf="${p}" title="Keyframe ${KF_LABEL[p]} at playhead">◇</button><button data-kfclear="${p}" title="Clear ${KF_LABEL[p]} keyframes">✕</button></div>`;
+    }).join("");
+  }
 }
 function renderCaps() {
   const l = $("#capList"); l.innerHTML = "";
@@ -316,17 +359,22 @@ function renderCaps() {
     l.appendChild(d);
   });
 }
-function renderAll() { renderMedia(); renderTimeline(); renderProps(); renderCaps(); }
+function renderAll() { S.clips.forEach(normClip); renderMedia(); renderTimeline(); renderProps(); renderCaps(); }
 
 /* clip drag / trim */
 function clipPointer(e, c, el) {
+  if (e.button === 2) return; // right-click is for the context menu
   e.stopPropagation();
-  S.selected = c.id; renderTimeline(); renderProps();
+  e.preventDefault();
+  S.selected = c.id; normClip(c); renderTimeline(); renderProps();
   const isL = e.target.classList?.contains("l"), isR = e.target.classList?.contains("r");
   const mode = isL ? "trimL" : isR ? "trimR" : "move";
   const startX = e.clientX, oStart = c.start, oDur = c.duration, oOff = c.offset || 0;
-  pushUndo._tmp = snap();
+  const before = snap();
+  let moved = false;
   const move = (ev) => {
+    if (!moved && Math.abs(ev.clientX - startX) < 4) return; // click, not drag
+    moved = true;
     const dt = (ev.clientX - startX) / pxPerSec;
     if (mode === "move") {
       let ns = Math.max(0, oStart + dt);
@@ -345,11 +393,49 @@ function clipPointer(e, c, el) {
   };
   const up = () => {
     window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
-    undoStack.push(pushUndo._tmp); if (undoStack.length > 80) undoStack.shift(); redoStack = [];
+    if (moved) { undoStack.push(before); if (undoStack.length > 80) undoStack.shift(); redoStack = []; }
     renderAll();
   };
   window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
 }
+// fill in defaults for clips from older saves so every tweak has an effect
+function normClip(c) {
+  const d = { vol: 1, speed: 1, fadeIn: 0, fadeOut: 0, scale: 1, op: 1, x: 0, y: 0, rot: 0, bri: 1, con: 1, sat: 1, blur: 0, offset: 0, font: 64 };
+  for (const k in d) if (c[k] === undefined || c[k] === null || Number.isNaN(c[k])) c[k] = d[k];
+  if (!c.kf || typeof c.kf !== "object") c.kf = {};
+  return c;
+}
+/* ================= KEYFRAMES (CapCut-style) ================= */
+// c.kf = { scale:[{t,v}], op:[...], x:[...], y:[...], rot:[...], vol:[...] }, t = seconds relative to clip start
+const KF_PROPS = ["scale", "op", "x", "y", "rot", "vol"];
+const KF_LABEL = { scale: "Scale", op: "Opacity", x: "Pos X", y: "Pos Y", rot: "Rotation", vol: "Volume" };
+function kfAdd(c, prop) {
+  normClip(c);
+  const lt = clamp(Math.round((S.currentTime - c.start) * 100) / 100, 0, c.duration);
+  const arr = (c.kf[prop] = c.kf[prop] || []);
+  const v = c[prop];
+  const i = arr.findIndex((k) => Math.abs(k.t - lt) < 0.02);
+  if (i >= 0) arr[i].v = v;
+  else { arr.push({ t: lt, v }); arr.sort((a, b) => a.t - b.t); }
+}
+function kval(c, prop, lt) {
+  const arr = (c.kf && c.kf[prop]) || [];
+  if (!arr.length) return c[prop];
+  if (lt <= arr[0].t) return arr[0].v;
+  for (let i = 0; i < arr.length - 1; i++) {
+    const a = arr[i], b = arr[i + 1];
+    if (lt >= a.t && lt <= b.t) {
+      const k = (lt - a.t) / Math.max(1e-6, b.t - a.t);
+      const s = k * k * (3 - 2 * k); // smoothstep ease
+      return a.v + (b.v - a.v) * s;
+    }
+  }
+  return arr[arr.length - 1].v;
+}
+function effProps(c, lt) {
+  return { x: kval(c, "x", lt), y: kval(c, "y", lt), scale: kval(c, "scale", lt), rot: kval(c, "rot", lt), op: kval(c, "op", lt) };
+}
+function hasKf(c) { return !!(c.kf && Object.values(c.kf).some((a) => a && a.length)); }
 function snapTime(t, self) {
   const cands = [S.currentTime];
   S.clips.forEach((c) => { if (c.id !== self.id) { cands.push(c.start, c.start + c.duration); } });
@@ -375,6 +461,14 @@ function splitClip(c) {
   const b = JSON.parse(JSON.stringify(c));
   b.id = uid(); b.start = Math.round(t * 100) / 100; b.duration = Math.round((c.duration - cut) * 100) / 100;
   if (b.mediaId) b.offset = Math.round(((c.offset || 0) + cut * (c.speed || 1)) * 100) / 100;
+  if (c.kf) { // split keyframes across the cut
+    b.kf = {};
+    for (const p in c.kf) {
+      const left = [], right = [];
+      (c.kf[p] || []).forEach((k) => { if (k.t < cut) left.push(k); else right.push({ t: Math.round((k.t - cut) * 100) / 100, v: k.v }); });
+      c.kf[p] = left; b.kf[p] = right;
+    }
+  }
   c.duration = cut;
   S.clips.push(b);
   renderAll(); toast("Split ✂");
@@ -427,16 +521,17 @@ function drawCoverContain(x, el, W, H, mode, iw, ih) {
 }
 function drawClipMedia(x, c, el, W, H, t) {
   const lt = t - c.start;
-  const g = fadeGain(c, t) * (c.op ?? 1);
+  const P = effProps(c, lt);
+  const g = fadeGain(c, t) * (P.op ?? 1);
   x.save();
   x.globalAlpha = clamp(g, 0, 1);
   x.filter = filterStr(c);
-  const cx = W / 2 + c.x * W * 0.5, cy = H / 2 + c.y * H * 0.5;
+  const cx = W / 2 + P.x * W * 0.5, cy = H / 2 + P.y * H * 0.5;
   x.translate(cx, cy);
-  if (c.rot) x.rotate((c.rot * Math.PI) / 180);
+  if (P.rot) x.rotate((P.rot * Math.PI) / 180);
   if (c.flip) x.scale(-1, 1);
   // transition flair
-  let sc = c.scale || 1;
+  let sc = P.scale || 1;
   if (c.anim === "zoom" && c.fadeIn > 0 && lt < c.fadeIn) sc *= 1 + 0.25 * (1 - lt / c.fadeIn);
   x.scale(sc, sc);
   let iw = 0, ih = 0;
@@ -445,7 +540,7 @@ function drawClipMedia(x, c, el, W, H, t) {
   if (!iw) { x.restore(); return; }
   const base = Math.min(W / iw, H / ih);
   const dw = iw * base, dh = ih * base;
-  if (c.fit === "fill") { x.restore(); x.save(); x.globalAlpha = clamp(g, 0, 1); x.filter = filterStr(c); x.translate(cx, cy); if (c.rot) x.rotate((c.rot * Math.PI) / 180); if (c.flip) x.scale(-1, 1); x.scale(sc, sc); drawCoverContain(x, el, W * 4, H * 4, "fill", iw, ih); x.restore(); return; }
+  if (c.fit === "fill") { x.restore(); x.save(); x.globalAlpha = clamp(g, 0, 1); x.filter = filterStr(c); x.translate(cx, cy); if (P.rot) x.rotate((P.rot * Math.PI) / 180); if (c.flip) x.scale(-1, 1); x.scale(sc, sc); drawCoverContain(x, el, W * 4, H * 4, "fill", iw, ih); x.restore(); return; }
   // slide flair
   if (c.anim === "slide") { const k = c.fadeIn > 0 ? clamp(lt / c.fadeIn, 0, 1) : 1; x.translate(-W * 0.3 * (1 - k), 0); }
   try { x.drawImage(el, -dw / 2, -dh / 2, dw, dh); } catch {}
@@ -453,16 +548,18 @@ function drawClipMedia(x, c, el, W, H, t) {
 }
 function drawTextClip(x, c, W, H, t) {
   const lt = t - c.start;
-  const g = fadeGain(c, t) * (c.op ?? 1);
+  const P = effProps(c, lt);
+  const g = fadeGain(c, t) * (P.op ?? 1);
   x.save();
   x.globalAlpha = clamp(g, 0, 1);
-  const fs = ((c.font || 64) / 960) * W * (c.scale || 1);
+  const fs = ((c.font || 64) / 960) * W * (P.scale || 1);
   x.font = `800 ${fs}px Inter, Segoe UI, Arial, sans-serif`;
   x.textAlign = "center"; x.textBaseline = "middle";
   let txt = c.text || "";
   if (c.anim === "type") txt = txt.slice(0, Math.floor(lt * 18) + 1);
-  let dx = W / 2 + c.x * W * 0.5, dy = H / 2 + c.y * H * 0.42;
+  let dx = W / 2 + P.x * W * 0.5, dy = H / 2 + P.y * H * 0.42;
   if (c.anim === "slide") { const k = c.fadeIn > 0 ? clamp(lt / c.fadeIn, 0, 1) : 1; dx = dx - W * 0.25 * (1 - k); }
+  if (P.rot) { x.translate(dx, dy); x.rotate((P.rot * Math.PI) / 180); x.translate(-dx, -dy); }
   if (c.anim === "pop") { const k = clamp(lt / 0.3, 0, 1); const b = 1 + 0.35 * (1 - k) * Math.cos(k * Math.PI); x.translate(dx, dy); x.scale(b, b); dx = 0; dy = 0; }
   x.lineWidth = Math.max(2, fs / 14); x.strokeStyle = "rgba(0,0,0,.75)";
   const isLow = c.name === "Lower third";
@@ -479,10 +576,11 @@ function drawTextClip(x, c, W, H, t) {
 }
 function drawStickerClip(x, c, W, H, t) {
   if (c.text === "⬛" || c.text === "⭕") {
-    const g = fadeGain(c, t) * (c.op ?? 1);
+    const P = effProps(c, t - c.start);
+    const g = fadeGain(c, t) * (P.op ?? 1);
     x.save(); x.globalAlpha = clamp(g, 0, 1);
-    x.translate(W / 2 + c.x * W * 0.5, H / 2 + c.y * H * 0.42);
-    x.rotate(((c.rot || 0) * Math.PI) / 180); x.scale(c.scale || 1, c.scale || 1);
+    x.translate(W / 2 + P.x * W * 0.5, H / 2 + P.y * H * 0.42);
+    x.rotate(((P.rot || 0) * Math.PI) / 180); x.scale(P.scale || 1, P.scale || 1);
     x.fillStyle = S.brand.color; x.strokeStyle = S.brand.color; x.lineWidth = 10;
     if (c.text === "⬛") x.fillRect(-70, -45, 140, 90);
     else { x.beginPath(); x.arc(0, 0, 60, 0, Math.PI * 2); x.stroke(); }
@@ -495,7 +593,7 @@ function drawFrame(x, W, H, t) {
   x.fillStyle = S.bg; x.fillRect(0, 0, W, H);
   x.filter = "none"; x.globalAlpha = 1;
   // base: latest-start video clip wins (topmost layering like Clipchamp)
-  const vids = activeAt("video", t);
+  const vids = S.hidden.video ? [] : activeAt("video", t);
   const base = vids[vids.length - 1];
   if (base) {
     const m = getMedia(base.mediaId);
@@ -510,7 +608,7 @@ function drawFrame(x, W, H, t) {
     x.fillStyle = "rgba(148,163,184,.5)"; x.font = `${Math.round(H * 0.05)}px Inter,sans-serif`; x.textAlign = "center";
     if (!S.clips.length) { x.fillText("Import media to start your CHAD edit 💪", W / 2, H / 2); }
   }
-  for (const c of activeAt("overlay", t)) {
+  for (const c of (S.hidden.overlay ? [] : activeAt("overlay", t))) {
     if (c.kind === "text") drawTextClip(x, c, W, H, t);
     else if (c.kind === "sticker") drawStickerClip(x, c, W, H, t);
     else if (c.mediaId) {
@@ -519,7 +617,7 @@ function drawFrame(x, W, H, t) {
     } else if (c.speak) { /* voiceover: no visual */ }
   }
   // captions burn-in
-  const cap = S.captions.find((c) => t >= c.start && t < c.end);
+  const cap = S.hidden.captions ? null : S.captions.find((c) => t >= c.start && t < c.end);
   if (cap) {
     x.save();
     x.font = `700 ${Math.round(H * 0.05)}px Inter,sans-serif`; x.textAlign = "center";
@@ -536,6 +634,7 @@ function drawFrame(x, W, H, t) {
 /* audio sync */
 const spoken = new Set();
 function syncAudio(t, playing) {
+  if (S.hidden.audio) playing = false;
   const all = [...activeAt("audio", t), ...activeAt("video", t).filter((c) => getMedia(c.mediaId)?.kind === "video")];
   const activeIds = new Set(all.map((c) => c.id));
   for (const c of S.clips) {
@@ -547,7 +646,7 @@ function syncAudio(t, playing) {
     if (isActive && playing) {
       const target = (c.offset || 0) + (t - c.start) * (c.speed || 1);
       el.playbackRate = c.speed || 1;
-      el.volume = clamp((c.vol ?? 1) * fadeGain(c, t), 0, 1);
+      el.volume = clamp(kval(c, "vol", t - c.start) * fadeGain(c, t), 0, 1);
       if (Math.abs((el.currentTime || 0) - target) > 0.35) { try { el.currentTime = target; } catch {} }
       el.play().catch(() => {});
     } else {
@@ -577,7 +676,7 @@ function pauseAll() {
 function seek(t) {
   S.currentTime = clamp(t, 0, projectDuration());
   spoken.clear();
-  renderTimeline();
+  updatePlayhead();
 }
 
 /* main loop */
@@ -588,7 +687,7 @@ function loop(ts) {
   if (S.playing) {
     S.currentTime += dt;
     if (S.currentTime >= projectDuration()) { S.currentTime = projectDuration(); setPlaying(false); }
-    renderTimeline();
+    updatePlayhead();
   }
   syncAudio(S.currentTime, S.playing);
   drawFrame(ctx, canvas.width, canvas.height, S.currentTime);
@@ -673,7 +772,7 @@ async function doExport() {
         syncAudio(S.currentTime, true);
         $("#expBar").style.width = (S.currentTime / dur) * 100 + "%";
         $("#expInfo").textContent = `Rendering ${W}×${H} @ ${fps}fps — ${fmt(S.currentTime)} / ${fmt(dur)} (${mime.includes("mp4") ? "MP4 H.264" : "WebM"})`;
-        renderTimeline();
+        updatePlayhead();
         if (t < dur) requestAnimationFrame(frame);
         else resolve();
       }
@@ -793,6 +892,28 @@ function applyTemplate(kind) {
 /* ================= INIT / EVENTS ================= */
 function init() {
   document.title = "ClipChad — 4K Browser Video Editor";
+  // dark editor look by default; toggle persists the override
+  try { if (localStorage.getItem("clipchad-theme") === "light") document.body.classList.remove("dark"); else document.body.classList.add("dark"); }
+  catch { document.body.classList.add("dark"); }
+  const paintTheme = () => { $("#themeBtn").textContent = document.body.classList.contains("dark") ? "Light" : "Dark"; };
+  paintTheme();
+  $("#themeBtn").onclick = () => {
+    document.body.classList.toggle("dark");
+    try { localStorage.setItem("clipchad-theme", document.body.classList.contains("dark") ? "dark" : "light"); } catch {}
+    paintTheme();
+  };
+  $("#menuBtn").onclick = () => {
+    document.querySelector(".sidebar").classList.toggle("collapsed");
+    document.querySelector(".layout").classList.toggle("side-collapsed");
+  };
+  $("#mediaSearch").addEventListener("input", renderMedia);
+  $("#timeline").addEventListener("click", (e) => {
+    const b = e.target.closest("button.eye"); if (!b) return;
+    e.stopPropagation();
+    const tr = b.dataset.eye;
+    S.hidden[tr] = !S.hidden[tr];
+    renderAll();
+  });
   // tabs
   $("#tabs").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-tab]"); if (!b) return;
@@ -808,10 +929,11 @@ function init() {
     if (mid) { addToTimeline(mid, e.target.closest('.track')?.dataset.track); return; }
     if (e.target.closest(".lane")) {
       const lane = e.target.closest(".lane");
-      const tr = lane.id.replace("lane-", "");
+      const raw = lane.id.replace("lane-", "");
+      const tr = raw === "captions" ? "video" : raw;
       const rect = lane.getBoundingClientRect();
       const t = (e.clientX - rect.left) / pxPerSec;
-      const files = [...e.dataTransfer.files];
+      const files = Array.from(e.dataTransfer.files || []);
       if (files.length) {
         const before = S.media.length;
         addFiles(files);
@@ -995,10 +1117,22 @@ function init() {
   bind("#pColor", (c, v) => (c.color = v));
   $("#dupBtn").onclick = () => dupClip();
   $("#delBtn").onclick = () => delClip();
+  // keyframe diamonds (CapCut-style): key the current value at the playhead
+  $("#kfGrid").addEventListener("click", (e) => {
+    const add = e.target.closest("button[data-kf]");
+    const clr = e.target.closest("button[data-kfclear]");
+    if (!add && !clr) return;
+    const c = getClip(S.selected); if (!c) return;
+    pushUndo();
+    if (add) kfAdd(c, add.dataset.kf);
+    else delete c.kf[clr.dataset.kfclear];
+    renderAll();
+  });
+  $("#kfClear").onclick = () => { const c = getClip(S.selected); if (!c) return; pushUndo(); c.kf = {}; renderAll(); };
 
   // save/load
   $("#saveBtn").onclick = () => {
-    const data = JSON.stringify({ name: $("#projName").value, clips: S.clips, captions: S.captions, bg: S.bg, aspect: S.aspect, brand: S.brand }, null, 1);
+    const data = JSON.stringify({ name: $("#projName").value, clips: S.clips, captions: S.captions, bg: S.bg, aspect: S.aspect, brand: S.brand, hidden: S.hidden }, null, 1);
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
     a.download = "clipchad-project.json"; a.click();
@@ -1006,10 +1140,7 @@ function init() {
     toast("Project saved 💾");
   };
   $("#loadBtn").onclick = () => $("#projInput").click();
-  const projInput = document.createElement("input");
-  projInput.type = "file"; projInput.accept = "application/json"; projInput.hidden = true;
-  document.body.appendChild(projInput);
-  projInput.onchange = (e) => {
+  $("#projInput").onchange = (e) => {
     const f = e.target.files[0]; if (!f) return;
     const r = new FileReader();
     r.onload = () => {
@@ -1017,14 +1148,18 @@ function init() {
         const o = JSON.parse(r.result);
         pushUndo();
         S.clips = o.clips || []; S.captions = o.captions || []; S.bg = o.bg || "#000";
+        if (o.hidden) S.hidden = Object.assign({ video: false, overlay: false, audio: false, captions: false }, o.hidden);
         S.aspect = o.aspect || "16:9"; $("#aspectSel").value = S.aspect;
         Object.assign(S.brand, o.brand || {});
         $("#projName").value = o.name || "My Chad Edit";
+        S.clips.forEach(normClip);
+        S.selected = null; S.currentTime = 0; pauseAll();
         // media refs may be missing after reload — keep clips but warn
-        sizePreview(); renderAll(); toast("Project loaded 📂 (re-import media files if clips are blank)");
+        sizePreview(); renderAll(); toast("Project loaded (re-import media files if clips are blank)");
       } catch { toast("Bad project file"); }
     };
     r.readAsText(f);
+    e.target.value = "";
   };
 
   // export
