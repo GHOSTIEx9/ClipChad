@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ClipChad — Free 4K Browser Video Editor</title>
+<meta name="description" content="ClipChad — free browser video editor like Clipchamp with 4K export, timeline, text, transitions, filters, screen & webcam recording. No watermark." />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img src="logo.svg" alt="ClipChad logo" class="brand-logo" />
+    <span class="free-badge">4K FREE • NO WATERMARK</span>
+  </div>
+  <div class="proj">
+    <input id="projName" value="My Chad Edit" maxlength="60" title="Project name" />
+    <span id="durLabel" class="dur">00:00.0</span>
+  </div>
+  <div class="top-actions">
+    <select id="aspectSel" title="Aspect ratio / canvas size">
+      <option value="16:9">16:9 Landscape</option>
+      <option value="9:16">9:16 Vertical</option>
+      <option value="1:1">1:1 Square</option>
+      <option value="4:5">4:5 Portrait</option>
+      <option value="21:9">21:9 Cinematic</option>
+    </select>
+    <select id="resSel" title="Export resolution — 4K free">
+      <option value="1280x720">HD 720p</option>
+      <option value="1920x1080" selected>Full HD 1080p</option>
+      <option value="2560x1440">QHD 1440p</option>
+      <option value="3840x2160">4K UHD 2160p ★ FREE</option>
+    </select>
+    <select id="fpsSel" title="Frame rate">
+      <option value="24">24 fps</option>
+      <option value="30" selected>30 fps</option>
+      <option value="60">60 fps</option>
+    </select>
+    <button id="undoBtn" title="Undo (Ctrl+Z)">↩</button>
+    <button id="redoBtn" title="Redo (Ctrl+Y)">↪</button>
+    <button id="saveBtn" class="ghost" title="Save project JSON">💾 Save</button>
+    <button id="loadBtn" class="ghost" title="Load project JSON">📂 Load</button>
+    <button id="exportBtn" class="export">⬇ Export 4K</button>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <nav class="tabs" id="tabs">
+      <button data-tab="media" class="on">📁<span>Media</span></button>
+      <button data-tab="record">⏺<span>Record</span></button>
+      <button data-tab="text">🔤<span>Text</span></button>
+      <button data-tab="audio">🎵<span>Audio</span></button>
+      <button data-tab="trans">✨<span>Trans.</span></button>
+      <button data-tab="elem">😎<span>Elements</span></button>
+      <button data-tab="filt">🎨<span>Filters</span></button>
+      <button data-tab="tmpl">📦<span>Templates</span></button>
+      <button data-tab="brand">💪<span>Brand</span></button>
+      <button data-tab="cap">💬<span>Captions</span></button>
+    </nav>
+    <div class="panels">
+      <section data-panel="media" class="on">
+        <div class="panel-head"><h3>Your media</h3><button id="importBtn" class="primary sm">+ Import</button></div>
+        <p class="muted">Drop video / image / audio anywhere. Everything stays in your browser.</p>
+        <input type="file" id="fileInput" accept="video/*,image/*,audio/*,.mkv,.mov,.mp4,.webm,.m4v,.avi,.flv,.mp3,.wav,.ogg,.opus,.m4a,.flac,.aac,.png,.jpg,.jpeg,.gif,.webp,.bmp,.heic" multiple hidden />
+        <input type="file" id="projInput" accept="application/json" hidden />
+        <div id="mediaGrid" class="media-grid"></div>
+        <div class="panel-head"><h3>Stock (free)</h3></div>
+        <div class="row wrap">
+          <button class="chip" data-stock="bars">🌈 Color bars</button>
+          <button class="chip" data-stock="gradient">🌅 Gradient card</button>
+          <button class="chip" data-stock="checker">🏁 Checker</button>
+          <button class="chip" data-stock="tone">🔊 Test tone 2s</button>
+        </div>
+        <p class="muted">Tip: right-click a timeline clip for split / duplicate / delete.</p>
+      </section>
+      <section data-panel="record">
+        <div class="panel-head"><h3>Record</h3></div>
+        <div class="row wrap">
+          <button id="recCam" class="primary sm">📷 Webcam</button>
+          <button id="recScreen" class="primary sm">🖥 Screen</button>
+          <button id="recBoth" class="primary sm">📷+🖥 Both</button>
+          <button id="recStop" class="danger sm" disabled>⏹ Stop</button>
+        </div>
+        <p class="muted" id="recStatus">No recording. Clips land in Media + timeline.</p>
+        <label class="check"><input type="checkbox" id="recMic" checked /> Include microphone</label>
+      </section>
+      <section data-panel="text">
+        <div class="panel-head"><h3>Text & titles</h3></div>
+        <div class="row wrap">
+          <button class="chip" data-text="Title">Title</button>
+          <button class="chip" data-text="Lower third">Lower third</button>
+          <button class="chip" data-text="Subtitle POP">Subtitle POP</button>
+          <button class="chip" data-text="Typewriter">Typewriter</button>
+          <button class="chip" data-text="Like & Subscribe">Like & Subscribe 🔔</button>
+        </div>
+        <label>Custom text <input id="customText" value="I AM THE CHAD EDITOR 💪" /></label>
+        <button id="addTextBtn" class="primary sm">+ Add text at playhead</button>
+      </section>
+      <section data-panel="audio">
+        <div class="panel-head"><h3>Audio</h3></div>
+        <p class="muted">Add background music / SFX. Volume + fades live in the right panel.</p>
+        <div class="row wrap">
+          <button class="chip" data-music="beep">🎹 Synth beep loop</button>
+          <button class="chip" data-music="noise">🌊 Soft noise bed</button>
+          <button class="chip" data-music="bass">🥁 Bass pulse</button>
+        </div>
+        <label>Text to speech (voiceover)
+          <textarea id="ttsText" rows="2">What's up legends, this edit was rendered in 4K for free with ClipChad.</textarea>
+        </label>
+        <div class="row">
+          <select id="ttsVoice"></select>
+          <button id="ttsSpeak" class="sm">🔊 Preview</button>
+          <button id="ttsAdd" class="sm">+ To timeline</button>
+        </div>
+      </section>
+      <section data-panel="trans">
+        <div class="panel-head"><h3>Transitions</h3></div>
+        <p class="muted">Select a <b>video</b> clip, then click a transition to add a fade in/out (0.5s cross-dissolve style).</p>
+        <div class="row wrap">
+          <button class="chip" data-tr="fade">Cross fade</button>
+          <button class="chip" data-tr="fadeblack">Fade to black</button>
+          <button class="chip" data-tr="slide">Slide push</button>
+          <button class="chip" data-tr="zoom">Zoom punch</button>
+          <button class="chip" data-tr="none">Remove fades</button>
+        </div>
+      </section>
+      <section data-panel="elem">
+        <div class="panel-head"><h3>Elements & stickers</h3></div>
+        <div class="row wrap">
+          <button class="chip" data-sticker="🔔">🔔 Bell</button>
+          <button class="chip" data-sticker="👍">👍 Like</button>
+          <button class="chip" data-sticker="🔥">🔥 Fire</button>
+          <button class="chip" data-sticker="💪">💪 Chad</button>
+          <button class="chip" data-sticker="⭐">⭐ Star</button>
+          <button class="chip" data-sticker="⬛">⬛ Shape block</button>
+          <button class="chip" data-sticker="⭕">⭕ Ring</button>
+        </div>
+        <button id="addWm" class="sm">+ Add logo watermark (Brand kit)</button>
+      </section>
+      <section data-panel="filt">
+        <div class="panel-head"><h3>Filters & adjust</h3></div>
+        <p class="muted">Select any video / image / overlay clip, then apply:</p>
+        <div class="row wrap">
+          <button class="chip" data-filter="none">🚫 None</button>
+          <button class="chip" data-filter="cinematic">🎬 Cinematic</button>
+          <button class="chip" data-filter="vivid">🌈 Vivid</button>
+          <button class="chip" data-filter="bw">⚫ B&W</button>
+          <button class="chip" data-filter="sepia">📜 Sepia</button>
+          <button class="chip" data-filter="cold">❄ Cold</button>
+          <button class="chip" data-filter="warm">🔥 Warm</button>
+        </div>
+      </section>
+      <section data-panel="tmpl">
+        <div class="panel-head"><h3>Templates</h3></div>
+        <button class="chip" data-tmpl="intro">▶ YouTube intro (16:9)</button>
+        <button class="chip" data-tmpl="reels">📱 Reels / Shorts (9:16)</button>
+        <button class="chip" data-tmpl="slideshow">🖼 Slideshow + music</button>
+        <button class="chip" data-tmpl="clear">🗑 Clear timeline</button>
+        <p class="muted">Templates build a starter timeline you can edit freely.</p>
+      </section>
+      <section data-panel="brand">
+        <div class="panel-head"><h3>Brand kit</h3></div>
+        <label>Logo image <input type="file" id="logoInput" accept="image/*" /></label>
+        <label>Accent color <input type="color" id="brandColor" value="#22d3ee" /></label>
+        <label>Channel name <input id="brandName" value="CHAD TV" /></label>
+        <button id="brandApply" class="sm primary">Apply watermark + lower third</button>
+      </section>
+      <section data-panel="cap">
+        <div class="panel-head"><h3>Captions / subtitles</h3><button id="capAdd" class="sm">+ Add</button></div>
+        <div class="row">
+          <button id="capAuto" class="sm">✨ Auto from text track</button>
+          <button id="capVtt" class="sm">⬇ VTT</button>
+        </div>
+        <div id="capList"></div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- CENTER -->
+  <section class="center">
+    <div class="floatbar" id="floatbar">
+      <button data-act="fit" title="Fit">⛶ Fit</button>
+      <button data-act="fill" title="Fill">🖼 Fill</button>
+      <button data-act="rot" title="Rotate 90°">⟳</button>
+      <button data-act="flip" title="Flip horizontal">⇋</button>
+      <button data-act="pip" title="Picture-in-picture corner">🪟 PiP</button>
+      <button data-act="bg" title="Background color">🎨 BG</button>
+      <input type="color" id="bgColor" value="#000000" title="Background color" />
+    </div>
+    <div class="preview-wrap" id="previewWrap">
+      <canvas id="preview"></canvas>
+      <div id="dropHint" class="drop-hint">Drop media here or <b>+ Import</b><br/><small>video • image • audio • 4K export free</small></div>
+    </div>
+    <div class="transport">
+      <button id="playBtn" class="play">▶</button>
+      <button id="backBtn" title="-1s">⏪</button>
+      <button id="fwdBtn" title="+1s">⏩</button>
+      <span id="timeLabel">00:00.0 / 00:00.0</span>
+      <input type="range" id="scrub" min="0" max="1000" value="0" />
+      <button id="splitBtn" title="Split selected clip at playhead (S)">✂ Split</button>
+      <button id="gapBtn" title="Remove gaps">🧹 Gaps</button>
+      <label class="zoom">🔍 <input type="range" id="zoom" min="20" max="220" value="80" /></label>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="ruler" id="ruler"></div>
+      <div class="track" data-track="video"><span class="tlabel">🎬 Video</span><div class="lane" id="lane-video"></div></div>
+      <div class="track" data-track="overlay"><span class="tlabel">🔤 Overlays</span><div class="lane" id="lane-overlay"></div></div>
+      <div class="track" data-track="audio"><span class="tlabel">🎵 Audio</span><div class="lane" id="lane-audio"></div></div>
+      <div class="playhead" id="playhead"></div>
+    </div>
+  </section>
+
+  <!-- RIGHT PROPS -->
+  <aside class="props">
+    <h3>Properties</h3>
+    <div id="noSel" class="muted">Select a clip on the timeline to edit fades, volume, speed, size, filters & colors.</div>
+    <div id="propForm" hidden>
+      <label>Name <input id="pName" /></label>
+      <div class="grid2">
+        <label>Start (s) <input id="pStart" type="number" step="0.1" min="0" /></label>
+        <label>Duration (s) <input id="pDur" type="number" step="0.1" min="0.2" /></label>
+      </div>
+      <div class="grid2" id="volRow">
+        <label>Volume <input id="pVol" type="range" min="0" max="1.5" step="0.05" /></label>
+        <label>Speed <input id="pSpeed" type="number" min="0.25" max="4" step="0.25" /></label>
+      </div>
+      <div class="grid2">
+        <label>Fade in (s) <input id="pFadeIn" type="number" min="0" max="5" step="0.1" /></label>
+        <label>Fade out (s) <input id="pFadeOut" type="number" min="0" max="5" step="0.1" /></label>
+      </div>
+      <div class="grid2">
+        <label>Scale <input id="pScale" type="range" min="0.2" max="3" step="0.05" /></label>
+        <label>Opacity <input id="pOp" type="range" min="0" max="1" step="0.05" /></label>
+      </div>
+      <div class="grid2">
+        <label>X (−1..1) <input id="pX" type="range" min="-1" max="1" step="0.02" /></label>
+        <label>Y (−1..1) <input id="pY" type="range" min="-1" max="1" step="0.02" /></label>
+      </div>
+      <label>Rotation° <input id="pRot" type="range" min="-180" max="180" step="1" /></label>
+      <div class="grid2">
+        <label>Brightness <input id="pBri" type="range" min="0.4" max="1.8" step="0.05" /></label>
+        <label>Contrast <input id="pCon" type="range" min="0.4" max="1.8" step="0.05" /></label>
+      </div>
+      <div class="grid2">
+        <label>Saturate <input id="pSat" type="range" min="0" max="2.5" step="0.05" /></label>
+        <label>Blur (px) <input id="pBlur" type="range" min="0" max="10" step="0.5" /></label>
+      </div>
+      <label id="textRow">Text <textarea id="pText" rows="2"></textarea></label>
+      <div class="grid2" id="fontRow">
+        <label>Font size <input id="pFont" type="number" min="12" max="220" /></label>
+        <label>Color <input id="pColor" type="color" /></label>
+      </div>
+      <div class="row">
+        <button id="dupBtn" class="sm">⧉ Duplicate</button>
+        <button id="delBtn" class="sm danger">🗑 Delete</button>
+      </div>
+    </div>
+    <h3>Project</h3>
+    <label>Background <input type="color" id="projBg" value="#000000" /></label>
+    <div class="row">
+      <button id="fitBtn" class="sm">Zoom to fit</button>
+      <button id="fullBtn" class="sm">⛶ Full preview</button>
+    </div>
+    <p class="muted">Shortcuts: Space play · S split · Del delete · ←/→ seek · Ctrl+Z/Y undo.</p>
+  </aside>
+</main>
+
+<div id="exportModal" class="modal" hidden>
+  <div class="card">
+    <h2>⬇ Export — 4K FREE, no watermark</h2>
+    <p id="expInfo" class="muted">Rendering…</p>
+    <div class="bar"><i id="expBar"></i></div>
+    <video id="expPrev" controls playsinline style="width:100%;border-radius:12px;background:#000" hidden></video>
+    <div class="row">
+      <button id="expCancel" class="danger">Cancel</button>
+      <a id="expDl" class="primary" hidden>⬇ Download video</a>
+      <button id="expClose" class="ghost">Close</button>
+    </div>
+    <p class="muted">Tip: Chrome/Edge export MP4 (H.264). Firefox exports WebM. 4K = 3840px wide, up to 40 Mbps, 60fps supported.</p>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<div id="ctxMenu" class="ctx" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
