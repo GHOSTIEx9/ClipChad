@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ClipChad — Free 4K Browser Video Editor</title>
-<meta name="description" content="ClipChad — free browser video editor like Clipchamp with 4K export, timeline, text, transitions, filters, screen & webcam recording. No watermark." />
+<title>ClipChad — 4K Browser Video Editor</title>
+<meta name="description" content="ClipChad — browser video editor with 4K export, timeline, text, transitions, filters, screen and webcam recording. No watermark." />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="favicon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,7 +16,7 @@
 <header class="topbar">
   <div class="brand">
     <img src="logo.svg" alt="ClipChad logo" class="brand-logo" />
-    <span class="free-badge">4K FREE • NO WATERMARK</span>
+    <span class="ver-badge">4K UHD</span>
   </div>
   <div class="proj">
     <input id="projName" value="My Chad Edit" maxlength="60" title="Project name" />
@@ -30,11 +30,11 @@
       <option value="4:5">4:5 Portrait</option>
       <option value="21:9">21:9 Cinematic</option>
     </select>
-    <select id="resSel" title="Export resolution — 4K free">
+    <select id="resSel" title="Export resolution">
       <option value="1280x720">HD 720p</option>
       <option value="1920x1080" selected>Full HD 1080p</option>
       <option value="2560x1440">QHD 1440p</option>
-      <option value="3840x2160">4K UHD 2160p ★ FREE</option>
+      <option value="3840x2160">4K UHD 2160p</option>
     </select>
     <select id="fpsSel" title="Frame rate">
       <option value="24">24 fps</option>
@@ -53,16 +53,16 @@
   <!-- LEFT SIDEBAR -->
   <aside class="sidebar">
     <nav class="tabs" id="tabs">
-      <button data-tab="media" class="on">📁<span>Media</span></button>
-      <button data-tab="record">⏺<span>Record</span></button>
-      <button data-tab="text">🔤<span>Text</span></button>
-      <button data-tab="audio">🎵<span>Audio</span></button>
-      <button data-tab="trans">✨<span>Trans.</span></button>
-      <button data-tab="elem">😎<span>Elements</span></button>
-      <button data-tab="filt">🎨<span>Filters</span></button>
-      <button data-tab="tmpl">📦<span>Templates</span></button>
-      <button data-tab="brand">💪<span>Brand</span></button>
-      <button data-tab="cap">💬<span>Captions</span></button>
+      <button data-tab="media" class="on"><span>Media</span></button>
+      <button data-tab="record"><span>Record</span></button>
+      <button data-tab="text"><span>Text</span></button>
+      <button data-tab="audio"><span>Audio</span></button>
+      <button data-tab="trans"><span>Transit.</span></button>
+      <button data-tab="elem"><span>Elements</span></button>
+      <button data-tab="filt"><span>Filters</span></button>
+      <button data-tab="tmpl"><span>Templates</span></button>
+      <button data-tab="brand"><span>Brand</span></button>
+      <button data-tab="cap"><span>Captions</span></button>
     </nav>
     <div class="panels">
       <section data-panel="media" class="on">
@@ -71,7 +71,7 @@
         <input type="file" id="fileInput" accept="video/*,image/*,audio/*,.mkv,.mov,.mp4,.webm,.m4v,.avi,.flv,.mp3,.wav,.ogg,.opus,.m4a,.flac,.aac,.png,.jpg,.jpeg,.gif,.webp,.bmp,.heic" multiple hidden />
         <input type="file" id="projInput" accept="application/json" hidden />
         <div id="mediaGrid" class="media-grid"></div>
-        <div class="panel-head"><h3>Stock (free)</h3></div>
+        <div class="panel-head"><h3>Stock</h3></div>
         <div class="row wrap">
           <button class="chip" data-stock="bars">🌈 Color bars</button>
           <button class="chip" data-stock="gradient">🌅 Gradient card</button>
@@ -112,7 +112,7 @@
           <button class="chip" data-music="bass">🥁 Bass pulse</button>
         </div>
         <label>Text to speech (voiceover)
-          <textarea id="ttsText" rows="2">What's up legends, this edit was rendered in 4K for free with ClipChad.</textarea>
+          <textarea id="ttsText" rows="2">What's up legends, this edit was rendered in 4K with ClipChad.</textarea>
         </label>
         <div class="row">
           <select id="ttsVoice"></select>
@@ -163,7 +163,7 @@
         <button class="chip" data-tmpl="reels">📱 Reels / Shorts (9:16)</button>
         <button class="chip" data-tmpl="slideshow">🖼 Slideshow + music</button>
         <button class="chip" data-tmpl="clear">🗑 Clear timeline</button>
-        <p class="muted">Templates build a starter timeline you can edit freely.</p>
+        <p class="muted">Templates build a starter timeline you can customize.</p>
       </section>
       <section data-panel="brand">
         <div class="panel-head"><h3>Brand kit</h3></div>
@@ -196,7 +196,7 @@
     </div>
     <div class="preview-wrap" id="previewWrap">
       <canvas id="preview"></canvas>
-      <div id="dropHint" class="drop-hint">Drop media here or <b>+ Import</b><br/><small>video • image • audio • 4K export free</small></div>
+      <div id="dropHint" class="drop-hint">Drop media here or <b>+ Import</b><br/><small>video • image • audio • MKV supported</small></div>
     </div>
     <div class="transport">
       <button id="playBtn" class="play">▶</button>
@@ -210,9 +210,9 @@
     </div>
     <div class="timeline" id="timeline">
       <div class="ruler" id="ruler"></div>
-      <div class="track" data-track="video"><span class="tlabel">🎬 Video</span><div class="lane" id="lane-video"></div></div>
-      <div class="track" data-track="overlay"><span class="tlabel">🔤 Overlays</span><div class="lane" id="lane-overlay"></div></div>
-      <div class="track" data-track="audio"><span class="tlabel">🎵 Audio</span><div class="lane" id="lane-audio"></div></div>
+      <div class="track" data-track="video"><span class="tlabel">Video</span><div class="lane" id="lane-video"></div></div>
+      <div class="track" data-track="overlay"><span class="tlabel">Overlays</span><div class="lane" id="lane-overlay"></div></div>
+      <div class="track" data-track="audio"><span class="tlabel">Audio</span><div class="lane" id="lane-audio"></div></div>
       <div class="playhead" id="playhead"></div>
     </div>
   </section>
@@ -274,7 +274,7 @@
 
 <div id="exportModal" class="modal" hidden>
   <div class="card">
-    <h2>⬇ Export — 4K FREE, no watermark</h2>
+    <h2>Export — 4K, no watermark</h2>
     <p id="expInfo" class="muted">Rendering…</p>
     <div class="bar"><i id="expBar"></i></div>
     <video id="expPrev" controls playsinline style="width:100%;border-radius:12px;background:#000" hidden></video>

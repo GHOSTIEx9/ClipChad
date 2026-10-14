@@ -1,4 +1,4 @@
-/* ClipChad — free browser video editor (Clipchamp-like) with 4K export */
+/* ClipChad — browser video editor with 4K export */
 (() => {
 "use strict";
 const $ = (s) => document.querySelector(s);
@@ -62,19 +62,36 @@ function mediaEl(m) {
 }
 
 /* ================= IMPORT ================= */
+const VID_EXT = ["mp4", "m4v", "webm", "mov", "mkv", "mka", "avi", "flv", "wmv", "mpg", "mpeg", "mpe", "m2ts", "mts", "3gp", "3g2", "ogv", "mxf", "divx", "f4v", "vob", "qt"];
+const AUD_EXT = ["mp3", "wav", "ogg", "oga", "opus", "m4a", "flac", "aac", "wma", "aiff", "f4a", "mp2"];
+const IMG_EXT = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "heic", "heif", "avif", "svg"];
+function kindFromFile(f) {
+  if (f.type.startsWith("video")) return "video";
+  if (f.type.startsWith("image")) return "image";
+  if (f.type.startsWith("audio")) return "audio";
+  // MKV and friends often ship with an empty MIME type — fall back to extension
+  const ext = (f.name.split(".").pop() || "").toLowerCase();
+  if (VID_EXT.includes(ext)) return "video";
+  if (AUD_EXT.includes(ext)) return "audio";
+  if (IMG_EXT.includes(ext)) return "image";
+  return null;
+}
 function addFiles(files) {
   [...files].forEach((f) => {
     const url = URL.createObjectURL(f);
-    const kind = f.type.startsWith("video") ? "video" : f.type.startsWith("image") ? "image" : f.type.startsWith("audio") ? "audio" : null;
-    if (!kind) return toast("Skipped " + f.name + " (need video/image/audio)");
+    const kind = kindFromFile(f);
+    if (!kind) { URL.revokeObjectURL(url); return toast("Skipped " + f.name + " (need video/image/audio)"); }
     const m = { id: uid(), kind, name: f.name, url, duration: kind === "image" ? 4 : 0, w: 0, h: 0 };
     S.media.push(m);
     const el = mediaEl(m);
-    if (kind === "video") { el.onloadedmetadata = () => { m.duration = el.duration || 5; m.w = el.videoWidth; m.h = el.videoHeight; renderMedia(); }; };
+    if (kind === "video") {
+      el.onloadedmetadata = () => { m.duration = el.duration || 5; m.w = el.videoWidth; m.h = el.videoHeight; renderMedia(); };
+      el.onerror = () => toast(m.name + ": this browser can't decode this file — try MP4 (H.264) or WebM");
+    }
     if (kind === "audio") { el.onloadedmetadata = () => { m.duration = el.duration || 5; renderMedia(); }; }
   });
   renderMedia();
-  toast("Imported ✓ — click + to add to timeline");
+  toast("Imported — click + to add to timeline");
 }
 function addMediaObj(m) { S.media.push(m); renderMedia(); return m; }
 function addToTimeline(mediaId, trackHint) {
@@ -145,7 +162,7 @@ function addStock(kind) {
       const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, "#7C3AED"); g.addColorStop(1, "#06B6D4");
       x.fillStyle = g; x.fillRect(0, 0, w, h);
       x.fillStyle = "rgba(255,255,255,.92)"; x.font = "900 110px Inter,sans-serif"; x.textAlign = "center";
-      x.fillText("CHAD CARD", w / 2, h / 2); x.font = "600 44px Inter,sans-serif"; x.fillText("edit • export 4k • free", w / 2, h / 2 + 70);
+      x.fillText("CHAD CARD", w / 2, h / 2); x.font = "600 44px Inter,sans-serif"; x.fillText("edit • export 4k", w / 2, h / 2 + 70);
     }); name = "Gradient card.png";
   } else {
     url = canvasURL(1280, 720, (x, w, h) => {
@@ -604,7 +621,7 @@ async function doExport() {
   const fps = +$("#fpsSel").value;
   const [W, H] = exportWH();
   const dur = projectDuration();
-  $("#expInfo").textContent = `Rendering ${W}×${H} @ ${fps}fps — ${fmt(dur)} — FREE 4K, no watermark…`;
+  $("#expInfo").textContent = `Rendering ${W}×${H} @ ${fps}fps — ${fmt(dur)} — no watermark…`;
   const wasPlaying = S.playing; setPlaying(false); pauseAll();
   await new Promise((r) => setTimeout(r, 300));
   try {
@@ -673,10 +690,10 @@ async function doExport() {
     const dl = $("#expDl");
     dl.href = url; dl.hidden = false;
     dl.download = ($("#projName").value || "clipchad").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") + `-${W}x${H}.${ext}`;
-    dl.textContent = `⬇ Download ${W}×${H} ${ext.toUpperCase()} (${(blob.size / 1048576).toFixed(1)} MB) — FREE`;
+    dl.textContent = `Download ${W}×${H} ${ext.toUpperCase()} (${(blob.size / 1048576).toFixed(1)} MB)`;
     $("#expBar").style.width = "100%";
-    $("#expInfo").textContent = `Done ✓ ${W}×${H} ${ext.toUpperCase()} rendered free with ClipChad. No watermark.`;
-    toast("Export complete 💪 4K free!");
+    $("#expInfo").textContent = `Done — ${W}×${H} ${ext.toUpperCase()} rendered with ClipChad. No watermark.`;
+    toast("Export complete");
   } catch (err) {
     console.error(err);
     $("#expInfo").textContent = "Export failed: " + err.message + " — try 1080p or WebM.";
@@ -758,9 +775,9 @@ function applyTemplate(kind) {
     const g = addMediaObj({ id: uid(), kind: "image", name: "Reels BG.png", url: canvasURL(720, 1280, (x, w, h) => { const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#F59E0B"); gr.addColorStop(0.5, "#EC4899"); gr.addColorStop(1, "#7C3AED"); x.fillStyle = gr; x.fillRect(0, 0, w, h); }), duration: 7 });
     elCache.set(g.id, Object.assign(new Image(), { src: g.url }));
     S.clips.push({ id: uid(), track: "video", kind: "image", mediaId: g.id, name: "Reels BG", start: 0, duration: 7, offset: 0, vol: 0, speed: 1, fadeIn: 0.3, fadeOut: 0.3, scale: 1, op: 1, x: 0, y: 0, rot: 0, flip: false, fit: "fit", bri: 1, con: 1.1, sat: 1.3, blur: 0, filter: "none", text: "", font: 64, color: "#fff", anim: "none" });
-    S.clips.push({ id: uid(), track: "overlay", kind: "text", mediaId: null, name: "Hook", start: 0.3, duration: 2.5, offset: 0, vol: 0, speed: 1, fadeIn: 0.2, fadeOut: 0.2, scale: 1, op: 1, x: 0, y: -0.6, rot: 0, flip: false, fit: "fit", bri: 1, con: 1, sat: 1, blur: 0, filter: "none", text: "POV: free 4K 👀", font: 72, color: "#fff", anim: "pop" });
+    S.clips.push({ id: uid(), track: "overlay", kind: "text", mediaId: null, name: "Hook", start: 0.3, duration: 2.5, offset: 0, vol: 0, speed: 1, fadeIn: 0.2, fadeOut: 0.2, scale: 1, op: 1, x: 0, y: -0.6, rot: 0, flip: false, fit: "fit", bri: 1, con: 1, sat: 1, blur: 0, filter: "none", text: "POV: 4K edit", font: 72, color: "#fff", anim: "pop" });
     S.clips.push({ id: uid(), track: "overlay", kind: "sticker", mediaId: null, name: "Sticker", start: 3, duration: 2.5, offset: 0, vol: 0, speed: 1, fadeIn: 0.2, fadeOut: 0.2, scale: 1, op: 1, x: 0, y: 0.2, rot: 0, flip: false, fit: "fit", bri: 1, con: 1, sat: 1, blur: 0, filter: "none", text: "🔥", font: 150, color: "#fff", anim: "pop" });
-    S.captions.push({ id: uid(), start: 0.3, end: 2.8, text: "POV: free 4K 👀" }, { id: uid(), start: 3, end: 5.5, text: "ClipChad goes hard 🔥" });
+    S.captions.push({ id: uid(), start: 0.3, end: 2.8, text: "POV: 4K edit" }, { id: uid(), start: 3, end: 5.5, text: "ClipChad goes hard 🔥" });
   } else {
     for (let i = 0; i < 3; i++) {
       const cols = [["#0EA5E9", "#6366F1"], ["#22C55E", "#0EA5E9"], ["#F59E0B", "#EF4444"]][i];
@@ -775,7 +792,7 @@ function applyTemplate(kind) {
 
 /* ================= INIT / EVENTS ================= */
 function init() {
-  document.title = "ClipChad — Free 4K Browser Video Editor";
+  document.title = "ClipChad — 4K Browser Video Editor";
   // tabs
   $("#tabs").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-tab]"); if (!b) return;
@@ -1039,13 +1056,13 @@ function init() {
     x.fillStyle = g; x.fillRect(0, 0, w, h);
     x.fillStyle = "#fff"; x.font = "900 80px Inter,sans-serif"; x.textAlign = "center";
     x.fillText("CLIPCHAD", w / 2, h / 2); x.font = "600 34px Inter,sans-serif"; x.fillStyle = "#FDE047";
-    x.fillText("free 4K editor — import media to start", w / 2, h / 2 + 60);
+    x.fillText("import media to start", w / 2, h / 2 + 60);
   });
   const dm = { id: uid(), kind: "image", name: "Welcome.png", url: demoURL, duration: 6, w: 1280, h: 720 };
   S.media.push(dm);
   elCache.set(dm.id, Object.assign(new Image(), { src: demoURL }));
   S.clips.push({ id: uid(), track: "video", kind: "image", mediaId: dm.id, name: "Welcome", start: 0, duration: 6, offset: 0, vol: 0, speed: 1, fadeIn: 0.4, fadeOut: 0.4, scale: 1, op: 1, x: 0, y: 0, rot: 0, flip: false, fit: "fit", bri: 1, con: 1, sat: 1.1, blur: 0, filter: "none", text: "", font: 64, color: "#fff", anim: "zoom" });
-  S.captions.push({ id: uid(), start: 0.5, end: 5.5, text: "Welcome to ClipChad — 4K export is FREE 💪" });
+  S.captions.push({ id: uid(), start: 0.5, end: 5.5, text: "Welcome to ClipChad — import media to begin" });
 
   sizePreview();
   renderAll();
